@@ -9,13 +9,43 @@ import datetime
 import sqlite3
 
 DATABASE_LOCATION = "sqlite:///my_played_tracks.sqlite"
-
 USER_ID = "luismalamoc"
-TOKEN = "BQAXQ0Jn4XJ1BXRRSCFnMAD74f7VU50HVkw5SdCSJp6Xhmjc-HbaGwhgUdR69sVDEx-I87ekgWfZr7_5xvcU2K" \
-        "-R_4W1OmvWaOruffbRL0G10bjSMtSOHzX9oCE4U6dFOiYH7UX8ziDl-mzzEzMvhw "
-ENDPOINT = "https://api.spotify.com/v1/me/player/recently-played?after={time}"
+TOKEN = "BQDKy4doatbwIbyp3xqcSTifQOyLwYoEBrtxdFWUx8or3NVwFTXj-MWHSn7j8iL5TjV2lsCpTtlQ7_lNlBNf0DzfzEMAXdRXNSLtyeWsmmCE6MmHca-hk8C5Hn47AuFTyd8rl1ejNTPrs0IgoUiawg"
+ENDPOINT = "https://api.spotify.com/v1/me/player/recently-played?after={unix_timestamp}"
+
+
+def check_if_valid_data(df: pd.DataFrame, today, yesterday) -> bool:
+    # Check if dataframe is empty
+    if df.empty:
+        print("No songs downloaded. Finishing execution")
+        return False
+
+    # Primary key check
+    if pd.Series(df["played_at"]).is_unique:
+        pass
+    else:
+        raise Exception("Primary Key Check is violated")
+
+    if df.isnull().values.any():
+        raise Exception("Null valued found")
+
+
+    timestamps = df["timestamp"].tolist()
+    for timestamp in timestamps:
+        timestamp_f = datetime.datetime.strptime(timestamp[0:19], "%Y-%m-%dT%H:%M:%S")
+        if timestamp_f < yesterday or timestamp_f > today:
+            raise Exception("At least one of the returned songs does not come from within the last 24 hours")
+
+    return True
+
 
 if __name__ == "__main__":
+
+    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
+    yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.datetime.now()
+    today = today.replace(hour=0, minute=0, second=0, microsecond=0)
+
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -23,10 +53,16 @@ if __name__ == "__main__":
     }
 
     today = datetime.datetime.now()
+    today = today.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_unix_timestamp = int(today.timestamp()) * 1000
+
     yesterday = today - datetime.timedelta(days=1)
+    yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_unix_timestamp = int(yesterday.timestamp()) * 1000
 
-    r = requests.get(ENDPOINT.format(time=yesterday_unix_timestamp), headers=headers)
+    endpoint_to_consume = ENDPOINT.format(unix_timestamp=yesterday_unix_timestamp)
+    print("Calling to: " + endpoint_to_consume)
+    r = requests.get(endpoint_to_consume, headers=headers)
 
     data = r.json()
 
@@ -50,4 +86,8 @@ if __name__ == "__main__":
 
     song_df = pd.DataFrame(song_dict, columns=["song_name", "artist_name", "played_at", "timestamp"])
 
-    print(song_df)
+    # Validate
+    if check_if_valid_data(song_df, today, yesterday):
+        print("Data valid, proceed to Load stage")
+
+    # Load
