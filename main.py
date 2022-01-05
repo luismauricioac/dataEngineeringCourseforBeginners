@@ -29,8 +29,8 @@ def check_if_valid_data(df: pd.DataFrame, today, yesterday) -> bool:
     if df.isnull().values.any():
         raise Exception("Null valued found")
 
-
     timestamps = df["timestamp"].tolist()
+
     for timestamp in timestamps:
         timestamp_f = datetime.datetime.strptime(timestamp[0:19], "%Y-%m-%dT%H:%M:%S")
         if timestamp_f < yesterday or timestamp_f > today:
@@ -40,12 +40,7 @@ def check_if_valid_data(df: pd.DataFrame, today, yesterday) -> bool:
 
 
 if __name__ == "__main__":
-
-    yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
-    yesterday = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
-    today = datetime.datetime.now()
-    today = today.replace(hour=0, minute=0, second=0, microsecond=0)
-
+    # Extract
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
@@ -91,3 +86,24 @@ if __name__ == "__main__":
         print("Data valid, proceed to Load stage")
 
     # Load
+    engine = sqlalchemy.create_engine(DATABASE_LOCATION)
+    conn = sqlite3.connect("my_played_tracks.sqlite")
+    cursor = conn.cursor()
+
+    sql_query = """
+    CREATE TABLE IF NOT EXISTS my_played_tracks(
+        song_name VARCHAR(200),
+        artist_name VARCHAR(200),
+        played_at VARCHAR(200),
+        timestamp VARCHAR(200),
+        CONSTRAINT primary_key_constraint PRIMARY KEY (played_at)
+    )
+    """
+
+    try:
+        song_df.to_sql("my_played_tracks", engine, index=False, if_exists="append")
+    except:
+        print("Data already exists in the database")
+
+    conn.close()
+    print("Close database successfully")
